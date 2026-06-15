@@ -188,44 +188,72 @@ In production, `p3dx-aaa` is managed by systemd (`p3dx-aaa-auth-backend.service`
 
 ## Local Development Quick Start
 
-### p3dx-apd
+### One-command startup (recommended)
+
+A pair of scripts in the home directory start and stop the entire platform:
 
 ```bash
-cd p3dx-apd
-cp .env.example .env   # fill in DB_*, JWT_*, APD_SIGNING_KEY_PATH, TEE_ORCHESTRATOR_URL
-go run ./cmd/server/main.go
+~/start-p3dx.sh   # builds Go binaries, starts all services
+~/stop-p3dx.sh    # stops all services
+```
+
+What the script does:
+1. Builds `p3dx-apd` → `/tmp/p3dx-apd` and `p3dx-top` → `/tmp/top-server`
+2. Starts `immudb-container`, `keycloak-dev`, `p3dx-aaa-auth-backend` via systemd
+3. Starts `p3dx-apd` (sources `/home/azureuser/p3dx-apd/.env`) in the background
+4. Starts `p3dx-top` (loads `~/Top/.env` via godotenv) in the background
+5. Starts `p3dx-auth-ui` (`npm run dev`) in the background
+
+Logs:
+
+```bash
+tail -f /tmp/p3dx-apd.log /tmp/p3dx-top.log /tmp/p3dx-ui.log
+```
+
+---
+
+### Manual startup (per service)
+
+#### p3dx-apd
+
+Environment variables are stored in `/home/azureuser/p3dx-apd/.env` (gitignored). Build and run:
+
+```bash
+cd ~/p3dx-apd
+go build -o /tmp/p3dx-apd ./cmd/server/main.go
+set -a && source .env && set +a
+/tmp/p3dx-apd
 # APD server listening on :8082
 ```
 
-### p3dx-top
+#### p3dx-top
+
+Environment variables are stored in `~/Top/.env` and loaded automatically at startup:
 
 ```bash
-cd p3dx-top
-cp .env.example .env   # fill in BACKEND_URL, BACKEND_API_KEY, APD_BASE_URL, STORE_KEY
-go run .
+cd ~/Top
+go build -o /tmp/top-server .
+/tmp/top-server
 # TOP running on port 8085
 ```
 
-### p3dx-aaa
+#### p3dx-aaa
+
+Managed by systemd. Start via:
 
 ```bash
-cd p3dx-aaa
-npm install
-cp .env.example .env   # fill in Keycloak, immuDB, TOP_BASE_URL, CONTRACT_SERVER_SECRET
-npm run setup:immudb   # first time only
-npm start
+sudo systemctl start immudb-container.service
+sudo systemctl start keycloak-dev.service
+sudo systemctl start p3dx-aaa-auth-backend.service
 # p3dx-aaa auth backend running on port 3001
 ```
 
-### p3dx-auth-ui
+#### p3dx-auth-ui
 
 ```bash
-cd p3dx-auth-ui
-npm install
-# .env for local dev (optional — defaults to http://localhost:3001):
-echo "VITE_BACKEND_URL=http://localhost:3001" > .env
+cd ~/p3dx-auth-ui
 npm run dev
-# Dev server at http://localhost:5174
+# Dev server at http://localhost:5173
 ```
 
 See each repository's README for the full environment variable reference.
